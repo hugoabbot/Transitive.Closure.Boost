@@ -1,6 +1,6 @@
 /**
  * @file tc.cpp
- * @brief CPU implementattion of the Floyd-Warshall algorithm for transitive closure using Boost
+ * @brief Implementattion of the Floyd-Warshall algorithm for transitive closure using Boost
  *
  */
 
@@ -15,9 +15,6 @@
 #include <boost/graph/floyd_warshall_shortest.hpp>
 
 #include "tc.hpp"
-
-// Max edge value mocking as infinity
-#define inf numeric_limits<float>::infinity();
 
 // Boost type declarations
 typedef double t_weight;
@@ -34,6 +31,7 @@ void usage() {
 }
 
 int main(int argc, char *argv[]) {
+    // Begin data parsing
     if (argc != 2) {
         usage();
         return 1;
@@ -46,13 +44,18 @@ int main(int argc, char *argv[]) {
         std::cout << "Failed to read input file or does not exist" << std::endl;
         return 1;
     }
-
+    // End data parsing
+    
+    std::vector<std::vector<int>> cpuBaseline (verticesCount, std::vector<int>(verticesCount));
     int edgeCount = 0;
+
+    // Finding the number of valid edges and creating an adjacency matrix copy for future answer validation
     for (int i = 0; i < verticesCount; ++i) {
         for (int j = 0; j < verticesCount; ++j) {
             if (adjacencyList[(i * verticesCount) + j] != INT_MAX && adjacencyList[(i * verticesCount) + j] != 0) {
                 ++edgeCount;
             }
+            cpuBaseline[i][j] = adjacencyList[(i * verticesCount) + j];
         }
     }
   
@@ -60,6 +63,7 @@ int main(int argc, char *argv[]) {
     int *edgeVertices = new int[edgeCount * 2];
     t_weight *edgeWeights = new t_weight[edgeCount];
 
+    // Storing all valid edges
     int verticesIndex = 0, weightsIndex = 0;
     for (int i = 0; i < verticesCount; ++i) {
         for (int j = 0; j < verticesCount; ++j) {
@@ -70,16 +74,6 @@ int main(int argc, char *argv[]) {
             }
         }
     }
-
-    // for (int i = 0; i < edgeCount; ++i) {
-    //     std::cout << edgeWeights[i] << std::endl;
-    // }
-
-    // for (int i = 0; i < edgeCount * 2; ++i) {
-    //     std::cout << edgeVertices[i++] << " ";
-    //     std::cout << edgeVertices[i] << std::endl;
-
-    // }
 
     for (size_t i = 0; i < edgeCount; ++i) {
         boost::add_edge(edgeVertices[i * 2], edgeVertices[i * 2 + 1], edgeWeights[i], graph);
@@ -104,15 +98,10 @@ int main(int argc, char *argv[]) {
     std::chrono::duration<double, std::milli> elapsedTime = endTime - startTime;
     std::cout << "Duration: " << std::fixed << std::setprecision(3) << elapsedTime.count() << " ms." << std::endl;
 
-    // Validation
+    // Casting and further checks to avoid int32 overflow from Boost API call
     std::vector<std::vector<int>> resultMatrix (verticesCount, std::vector<int>(verticesCount));
-    std::vector<std::vector<int>> cpuBaseline (verticesCount, std::vector<int>(verticesCount));
-
     for (int i = 0; i < verticesCount; ++i) {
         for (int j = 0; j < verticesCount; ++j) {
-            cpuBaseline[i][j] = adjacencyList[(i * verticesCount) + j];
-            
-            // Casting and further checks to avoid int32 overflow from Boost API call
             resultMatrix[i][j] = static_cast<int> (boostMatrix[i][j]);
             if (resultMatrix[i][j] == INT_MIN) {
                 resultMatrix[i][j] = INT_MAX;
@@ -120,10 +109,11 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    // CPU baseline calculations
     for (int k = 0; k < verticesCount; ++k) {
         for (int i = 0; i < verticesCount; ++i) {
             for (int j = 0; j < verticesCount; ++j) {
-                // Avoiding int32 overflow by avoiding computations with 'inf', no impact to result
+                // Bypassing int32 overflows by ditching computations with 'inf' values, which has no impact on result
                 if (!(cpuBaseline[i][k] == INT_MAX || cpuBaseline[k][j] == INT_MAX) && (cpuBaseline[i][j] > (cpuBaseline[i][k] + cpuBaseline[k][j]))) {
                     cpuBaseline[i][j] = cpuBaseline[i][k] + cpuBaseline[k][j];
                 }
@@ -131,11 +121,12 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    // Comparing CPU baseline results with Boost results
     bool errorPresent = false;
     for (int i = 0; i < verticesCount; ++i) {
         for (int j = 0; j < verticesCount; ++j) {
             if (cpuBaseline[i][j] != resultMatrix[i][j]) {
-                std::cout << "Incorrect result at index [" << i << "," << j << "] | Boost CPU = " << resultMatrix[i][j] << " vs. Baseline CPU = " << cpuBaseline[i][j] << std::endl;
+                std::cout << "Incorrect result at index [" << i << "," << j << "] | Boost = " << resultMatrix[i][j] << " vs. Baseline CPU = " << cpuBaseline[i][j] << std::endl;
                 errorPresent = true;
             }
         }
@@ -143,6 +134,11 @@ int main(int argc, char *argv[]) {
 
     if (!errorPresent) {
         std::cout << "Correct!" << std::endl;
+        
+        if (!writeCSV(argv[1], resultMatrix)) {
+            std::cout << "Failed to write 'resultMatrix' to a new .csv file" << std::endl;
+            return 1;
+        }
     }
 
     return 0;
