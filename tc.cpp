@@ -1,24 +1,23 @@
 /**
  * @file tc.cpp
  * @brief CPU implementattion of the Floyd-Warshall algorithm for transitive closure using Boost
+ *
  */
 
 #include <iostream>
 #include <vector>
 #include <chrono>
 #include <fstream>
-#include <limits.h>
+#include <limits>
 
-#include <boost/graph/undirected_graph.hpp>
+#include <boost/graph/directed_graph.hpp>
 #include <boost/graph/exterior_property.hpp>
 #include <boost/graph/floyd_warshall_shortest.hpp>
 
-#include "csv_reader.hpp"
-
-// brew install boost
+#include "tc.hpp"
 
 // Max edge value mocking as infinity
-#define MAX_EDGE_VALUE 99999
+#define inf numeric_limits<float>::infinity();
 
 // Boost type declarations
 typedef double t_weight;
@@ -29,8 +28,9 @@ typedef boost::exterior_vertex_property<Graph, t_weight> DistanceProperty;
 typedef DistanceProperty::matrix_type DistanceMatrix;
 typedef DistanceProperty::matrix_map_type DistanceMatrixMap;
 
+
 void usage() {
-    fprintf(stderr, "\nUsage:  ./tc-boost.out <input_file>\n");
+    fprintf(stderr, "\nUsage:  ./tc.out <input_file>\n");
 }
 
 int main(int argc, char *argv[]) {
@@ -43,81 +43,79 @@ int main(int argc, char *argv[]) {
     int verticesCount;
 
     if (!readCSV(argv[1], adjacencyList, verticesCount)) {
-      std::cout << "Failed to read input file or does not exist" << std::endl;
-      return 1;
+        std::cout << "Failed to read input file or does not exist" << std::endl;
+        return 1;
     }
 
     int edgeCount = 0;
     for (int i = 0; i < verticesCount; ++i) {
         for (int j = 0; j < verticesCount; ++j) {
-            if (adjacencyList[(i * verticesCount) + j] != MAX_EDGE_VALUE) {
+            if (adjacencyList[(i * verticesCount) + j] != INT_MAX && adjacencyList[(i * verticesCount) + j] != 0) {
                 ++edgeCount;
             }
         }
     }
   
-    Graph g;
-    int *edges = new int[edgeCount * 2];
-    t_weight *weight = new t_weight[edgeCount];
+    Graph graph;
+    int *edgeVertices = new int[edgeCount * 2];
+    t_weight *edgeWeights = new t_weight[edgeCount];
 
-    int edgesIndex = 0, weightIndex = 0;
+    int verticesIndex = 0, weightsIndex = 0;
     for (int i = 0; i < verticesCount; ++i) {
         for (int j = 0; j < verticesCount; ++j) {
-            if (adjacencyList[(i * verticesCount) + j] != MAX_EDGE_VALUE) {
-                edges[edgesIndex] = i;
-                edges[++edgesIndex] = j;
-                weight[weightIndex] = adjacencyList[(i * verticesCount) + j];
-                ++edgesIndex;
-                ++weightIndex;
+            if (adjacencyList[(i * verticesCount) + j] != INT_MAX && adjacencyList[(i * verticesCount) + j] != 0) {
+                edgeVertices[verticesIndex++] = i;
+                edgeVertices[verticesIndex++] = j;
+                edgeWeights[weightsIndex++] = adjacencyList[(i * verticesCount) + j];
             }
         }
     }
 
-    for (std::size_t i = 0; i < edgeCount; ++i) {
-        boost::add_edge(edges[i * 2], edges[i * 2 + 1], weight[i], g);
+    // for (int i = 0; i < edgeCount; ++i) {
+    //     std::cout << edgeWeights[i] << std::endl;
+    // }
+
+    // for (int i = 0; i < edgeCount * 2; ++i) {
+    //     std::cout << edgeVertices[i++] << " ";
+    //     std::cout << edgeVertices[i] << std::endl;
+
+    // }
+
+    for (size_t i = 0; i < edgeCount; ++i) {
+        boost::add_edge(edgeVertices[i * 2], edgeVertices[i * 2 + 1], edgeWeights[i], graph);
     }
 
-    WeightMap weightPMap = boost::get(boost::edge_weight, g);
-    DistanceMatrix calculatedEdges(num_vertices(g));
-    DistanceMatrixMap dm(calculatedEdges, g);
+    WeightMap weightMap = boost::get(boost::edge_weight, graph);
+    DistanceMatrix boostMatrix(num_vertices(graph));
+    DistanceMatrixMap distanceMatrixMap(boostMatrix, graph);
   
     // Start timing
-    auto start = std::chrono::high_resolution_clock::now();
+    auto startTime = std::chrono::high_resolution_clock::now();
 
-    bool valid = floyd_warshall_all_pairs_shortest_paths(g, dm, boost::weight_map(weightPMap));
+    bool valid = floyd_warshall_all_pairs_shortest_paths(graph, distanceMatrixMap, boost::weight_map(weightMap));
     if (!valid) {
         std::cerr << "Error: Negative cycle in matrix" << std::endl;
         return 1;
     }
 
     // End Timing
-    auto end = std::chrono::high_resolution_clock::now();
+    auto endTime = std::chrono::high_resolution_clock::now();
 
-    std::chrono::duration<double, std::milli> elapsedTime = end - start;
+    std::chrono::duration<double, std::milli> elapsedTime = endTime - startTime;
     std::cout << "Duration: " << std::fixed << std::setprecision(3) << elapsedTime.count() << " ms." << std::endl;
 
-//     std::cout << "Distance matrix: " << std::endl;
-//   for (std::size_t i = 0; i < num_vertices(g); ++i) {
-//     for (std::size_t j = 0; j < num_vertices(g); ++j) {
-//       std::cout << "From vertex " << i << " to " << j << " : ";
-//       if(calculatedEdges[i][j] == MAX_EDGE_VALUE)
-//         std::cout << "inf" << std::endl;
-//       else
-//         std::cout << calculatedEdges[i][j] << std::endl;
-//     }
-//     std::cout << std::endl;
-//   }
-
-    // Verification and validation
+    // Validation
+    std::vector<std::vector<int>> resultMatrix (verticesCount, std::vector<int>(verticesCount));
     std::vector<std::vector<int>> cpuBaseline (verticesCount, std::vector<int>(verticesCount));
-    std::vector<std::vector<int>> test (verticesCount, std::vector<int>(verticesCount));
 
     for (int i = 0; i < verticesCount; ++i) {
         for (int j = 0; j < verticesCount; ++j) {
             cpuBaseline[i][j] = adjacencyList[(i * verticesCount) + j];
-            test[i][j] = static_cast<int> (calculatedEdges[i][j]);
-            if (test[i][j] == INT_MIN) {
-                test[i][j] = MAX_EDGE_VALUE;
+            
+            // Casting and further checks to avoid int32 overflow from Boost API call
+            resultMatrix[i][j] = static_cast<int> (boostMatrix[i][j]);
+            if (resultMatrix[i][j] == INT_MIN) {
+                resultMatrix[i][j] = INT_MAX;
             }
         }
     }
@@ -125,25 +123,25 @@ int main(int argc, char *argv[]) {
     for (int k = 0; k < verticesCount; ++k) {
         for (int i = 0; i < verticesCount; ++i) {
             for (int j = 0; j < verticesCount; ++j) {
-                if (cpuBaseline[i][j] > (cpuBaseline[i][k] + cpuBaseline[k][j])) {
+                // Avoiding int32 overflow by avoiding computations with 'inf', no impact to result
+                if (!(cpuBaseline[i][k] == INT_MAX || cpuBaseline[k][j] == INT_MAX) && (cpuBaseline[i][j] > (cpuBaseline[i][k] + cpuBaseline[k][j]))) {
                     cpuBaseline[i][j] = cpuBaseline[i][k] + cpuBaseline[k][j];
                 }
             }
         }
     }
 
-    int errorFlag = 0;
+    bool errorPresent = false;
     for (int i = 0; i < verticesCount; ++i) {
         for (int j = 0; j < verticesCount; ++j) {
-            std::cout << cpuBaseline[i][j] << " | " << test[i][j] << std::endl;
-            if (cpuBaseline[i][j] != test[i][j] && i != j) {
-                std::cout << "Incorrect result at index [" << i << "," << j << "] | Boost CPU = " << test[i][j] << " vs. Baseline CPU = " << cpuBaseline[i][j] << std::endl;
-                errorFlag = 1;
+            if (cpuBaseline[i][j] != resultMatrix[i][j]) {
+                std::cout << "Incorrect result at index [" << i << "," << j << "] | Boost CPU = " << resultMatrix[i][j] << " vs. Baseline CPU = " << cpuBaseline[i][j] << std::endl;
+                errorPresent = true;
             }
         }
     }
 
-    if (!errorFlag) {
+    if (!errorPresent) {
         std::cout << "Correct!" << std::endl;
     }
 

@@ -2,10 +2,6 @@ import csv
 import random
 import sys
 import time
-import math
-
-# Max edge value mocking as infinity
-inf = 99999
 
 def save_matrix_to_csv(filename, matrix, num_vertices):
     with open(filename, mode='w', newline='') as file:
@@ -19,16 +15,18 @@ def generate_default_list(num_vertices, sparsity_rate, filename):
     matrix = []
     for i in range(num_vertices):
         for j in range(num_vertices):
-            if random.randint(1, 100) > sparsity_rate and i != j:
+            if i == j:
+                matrix.append(0)
+            elif random.randint(1, 100) > sparsity_rate:
                 matrix.append(random.randint(1, 100))
             else:
-                matrix.append(inf)
+                matrix.append('inf')
 
     save_matrix_to_csv(filename, matrix, num_vertices)
 
 def main():
     if len(sys.argv) != 4:
-        print("Usage: python matrix_generator.py <num_vertices> <sparsity_rate> <output_file>")
+        print("Usage: python3 matrix_generator.py <num_vertices> <sparsity_rate> <output_file>")
         return
 
     num_vertices = int(sys.argv[1])
