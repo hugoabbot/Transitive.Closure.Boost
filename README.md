@@ -2,7 +2,7 @@
 
 ## Overview
 
-Floyd-Warshall transitive closure algorithm for weighted and directed graphs using the Boost API. This project took inspiration both from a Stack Overflow [post](https://stackoverflow.com/questions/26855184/floyd-warshall-all-pairs-shortest-paths-on-weighted-undirected-graph-boost-g) for the same process but for undirected graphs, and from the general lack of documentation and resources found online for this purpose.
+Floyd-Warshall transitive closure algorithm for weighted and directed graphs using the Boost API. This project took inspiration from a Stack Overflow [post](https://stackoverflow.com/questions/26855184/floyd-warshall-all-pairs-shortest-paths-on-weighted-undirected-graph-boost-g) for the same process but for undirected graphs.
 
 ## Boost
 
@@ -42,7 +42,3 @@ followed by the instruction and usage to execute:
 ```bash
 $ ./tc.out <input_file>
 ```
-
-## Further Work
-
-Additional work should be done to support additional input file types. Furthermore benchmarking needs to be done to compare the runtimes across different implementations, such as Boost, OpenMP, and GPU variants, such as Cuda, Thrust, etc. Considerations need to be made regarding the efficiency of these algorithms with respect to input parameters, such as number of nodes and sparsity rate.
